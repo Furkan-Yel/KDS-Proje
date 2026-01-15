@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tekstil KDS - Yönetim Paneli</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        /* Tek ekrana sığdırmak için özel stiller */
+        .compact-row { display: flex; gap: 10px; margin-bottom: 10px; height: 38vh; }
+        .compact-col-3 { width: 25%; display: flex; flex-direction: column; }
+        .compact-col-6 { width: 50%; display: flex; flex-direction: column; }
+        .chart-container { flex-grow: 1; min-height: 0; }
+        .table-container { flex-grow: 1; min-height: 0; overflow: auto; }
+        h5 { margin: 5px 0; font-size: 0.9em; color: #3e2723; border-bottom: 2px solid #bf360c; display:inline-block;}
+        .kpi-row { margin-bottom: 10px; }
+        /* Loading durumları için */
+        .btn-loading { opacity: 0.7; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h1 style="color:#bf360c; text-align:center;">Sn. <%= user %></h1>
+        <hr>
+        <button onclick="showPage('genel-bakis')">🏠 Genel Bakış</button>
+        <button onclick="showPage('genel-islemler')">📊 Genel İşlemler</button>
+        <br><br>
+        <button class="logout-btn" onclick="window.location.href='/logout'">🚪 Çıkış Yap</button>
+    </div>
+
+    <div class="main-content">
+        
+        <div id="genel-bakis" class="page-section">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab(event, 'tab-genel')">🏭 Genel Bilgiler (Üretim-Makine-Tedarik)</button>
+                <button class="tab-btn" onclick="openTab(event, 'tab-finans')">💰 Kar Marjı & Kapasite</button>
+            </div>
+
+            <div id="tab-genel" class="tab-content" style="display:block;">
+                
+                <div class="grid-4 kpi-row">
+                    <div class="kpi-card"><h6>Aylık Üretim</h6><h3><%= formatTr(data.globalAylik) %></h3></div>
+                    <div class="kpi-card"><h6>Dönemlik Üretim</h6><h3><%= formatTr(data.globalDonemlik) %></h3></div>
+                    <div class="kpi-card"><h6>Dönemsel Kusurlu Ürün</h6><h3><%= data.firmaStats['Kusurlu Ürün'] %></h3></div>
+                    <div class="kpi-card"><h6>Hata Payı</h6><h3>%2.4</h3></div>
+                </div>
+
+                <div class="compact-row">
+                    <div class="compact-col-3">
+                        <h5>📈 Dönemsel Üretim</h5>
+                        <div id="esmira-chart" class="chart-container"></div>
+                    </div>
+                    <div class="compact-col-3">
+                        <h5>📊 Toplam İşlemler</h5>
+                        <div id="total-chart" class="chart-container"></div>
+                    </div>
+                    <div class="compact-col-3">
+                        <h5>⚙️ Makine Durumu</h5>
+                        <div id="makine-pie" class="chart-container"></div>
+                    </div>
+                    <div class="compact-col-3">
+                        <h5>📋 Makine Listesi</h5>
+                        <div class="table-container">
+                            <table style="font-size:0.75em;">
+                                <tr><th>ID</th><th>Model</th><th>Durum</th></tr>
+                                <% data.makine.forEach(m => { 
+                                    let color = m['Güncel Durum'] === 'Çalışıyor' ? 'green' : 'red';
+                                %>
+                                    <tr>
+                                        <td><%= m['Makine ID'] %></td>
+                                        <td><%= m['Marka / Model'] %></td>
+                                        <td style="color:<%= color %>; font-weight:bold;"><%= m['Güncel Durum'] %></td>
+                                    </tr>
+                                <% }) %>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="compact-row">
+                    <div class="compact-col-6">
+                        <h5>📦 Tedarikçi Listesi</h5>
+                        <div class="table-container">
+                            <table style="font-size:0.8em;">
+                                <tr><th>Firma</th><th>Kategori</th><th>Ücret</th><th>Vade</th></tr>
+                                <% data.tedarik.forEach(t => { %>
+                                    <tr>
+                                        <td><%= t['Firma Adı'] %></td>
+                                        <td><%= t['Kategori'] %></td>
+                                        <td><%= t['Birim Başına Ücret (TL)'] %> TL</td>
+                                        <td><%= t['Ödeme Vadesi (Gün)'] %> Gün</td>
+                                    </tr>
+                                <% }) %>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="compact-col-6">
+                        <h5>📊 Tedarikçi Fiyat Analizi</h5>
+                        <div id="tedarik-bar" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-finans" class="tab-content">
+                <div class="grid-5" id="finance-kpis"></div>
+
+                <div class="row" style="margin-top:20px;">
+                    <div class="col-3">
+                        <div class="header-underline">📉 Aylık Ort. Giderler</div>
+                        <div class="table-container" style="height:200px;">
+                            <table class="small-table">
+                                <% data.giderTablosu.forEach(g => { %>
+                                    <tr><td><%= g.kalem %></td><td>₺<%= formatTr(g.tutar) %></td></tr>
+                                <% }) %>
+                            </table>
+                        </div>
+                        <div class="kpi-card" style="margin-top:10px; background:#ffebee; border-color:#ffcdd2;">
+                            <h6 style="color:#c62828">TOPLAM SABİT (AYLIK)</h6>
+                            <h3 style="color:#b71c1c">₺<%= formatTr(data.sabitGiderToplam) %></h3>
+                        </div>
+                    </div>
+
+                    <div class="col-4">
+                        <div class="header-underline">🤝 İhale Seçimi</div>
+                        <select id="tender-select" multiple onchange="updateFinance()" style="width:100%; height:120px; border:1px solid #a1887f; border-radius:4px; padding:5px;">
+                            <% data.finansOzet.forEach(f => { %>
+                                <option value="<%= f.firma %>"><%= f.firma %></option>
+                            <% }) %>
+                        </select>
+                        <div class="header-underline" style="margin-top:15px;">🏭 Kapasite Analizi</div>
+                        <div class="row">
+                            <div class="col-6"><b>Aylık Kap.:</b> <%= formatTr(data.globalAylik) %></div>
+                            <div class="col-6"><b>Dönemlik Kap.:</b> <%= formatTr(data.globalDonemlik) %></div>
+                        </div>
+                        <div id="capacity-result" style="margin-top:10px; font-weight:bold;"></div>
+                    </div>
+
+                    <div class="col-5">
+                        <div class="header-underline">📊 Gelir Gider Tablosu & Grafiği</div>
+                        <div id="finance-table-container" style="height:150px; overflow-y:auto; margin-bottom:10px;"></div>
+                        <div id="finance-chart" class="chart-container" style="height:200px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="genel-islemler" class="page-section" style="display:none;">
+            <h2 class="page-title">Operasyonel İşlemler</h2>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab2(event, 'op-kumas')">🧵 Kumaş Tedariği</button>
+                <button class="tab-btn" onclick="openTab2(event, 'op-kesim')">✂️ Kesim Raporları</button>
+                <button class="tab-btn" onclick="openTab2(event, 'op-fason')">🏭 Fason Seçenekleri</button>
+            </div>
+
+            <div id="op-kumas" class="tab-content-2" style="display:block;">
+                <div class="row">
+                    <div class="col-4">
+                        <div class="header-underline">1. Firma Seç & İhtiyaçlar</div>
+                        <select id="kumas-firma-select" onchange="updateKumasNeeds()" style="width:100%; padding:8px; margin-bottom:10px;">
+                            <option value="">Firma Seçiniz...</option>
+                        </select>
+                        <div id="kumas-needs-list" style="height:350px; overflow-y:auto; border:1px solid #ddd; background:white; padding:5px; border-radius:5px;">
+                            <div style="color:#888; text-align:center; padding:20px;">Firma seçince ihtiyaçlar burada listelenir.</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="header-underline">2. Grafikten Tedarikçi Seç</div>
+                        <div id="supplier-graph-area" class="chart-container" style="height:380px;">
+                            <div style="color:#888; text-align:center; padding:100px 0;">Soldan "Tedarikçi Gör" butonuna basınız.</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="header-underline">3. Seçilen Tedarikçiler</div>
+                        <div class="factory-card" style="text-align:left; min-height:380px; overflow-y:auto; max-height:380px;">
+                            <% if (data.fabricAssignments.length === 0) { %>
+                                <div style="color:#888; text-align:center; padding-top:20px;">Henüz seçim yapılmadı.</div>
+                            <% } else { %>
+                                <% data.fabricAssignments.forEach(a => { %>
+                                    <div style="border-bottom:1px solid #ccc; padding:5px; margin-bottom:5px; font-size:0.85em;">
+                                        <small style="color:#555; font-weight:bold;">Firma: <%= a.firma %></small><br>
+                                        <% if (a.model === 'ALL') { %>
+                                            <b style="color:#1565c0">[TÜMÜ] <%= a.renk %></b><br>
+                                        <% } else { %>
+                                            <b><%= a.model %></b> - <%= a.renk %><br>
+                                        <% } %>
+                                        <span style="color:#bf360c"><%= a.tedarikci %></span><br>
+                                        Fiyat: <%= a.fiyat %> TL | Toplam: <%= formatTr(a.tutar) %> TL
+                                    </div>
+                                <% }) %>
+                                <button onclick="resetAssignments()" style="width:100%; margin-top:10px; background:#c62828; color:white; border:none; padding:5px;">Tümünü Sıfırla</button>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="op-kesim" class="tab-content-2" style="display:none;">
+                <div class="row">
+                    <div class="col-6">
+                        <div class="header-underline">🏢 Firma Kesim Özeti</div>
+                        <select id="kesim-firma-select" onchange="updateKesimAnaliz()" style="width:100%; padding:8px;">
+                            <option value="">Firma Seçiniz...</option>
+                        </select>
+                        <div class="grid-2" style="margin-top:10px;">
+                            <div class="kpi-card"><h6>Toplam Kumaş</h6><h4 id="kesim-total-kg">-</h4></div>
+                            <div class="kpi-card"><h6>Toplam Maliyet</h6><h4 id="kesim-total-tl">-</h4></div>
+                        </div>
+                        <div id="kesim-chart" class="chart-container" style="height:250px; margin-top:10px;"></div>
+                    </div>
+                    <div class="col-6">
+                        <div class="header-underline">✂️ Model Bazlı Detay</div>
+                        <select id="kesim-model-select" onchange="updateKesimModelAnaliz()" style="width:100%; padding:8px;">
+                            <option value="">Önce Firma Seçiniz</option>
+                        </select>
+                        <div id="kesim-model-info" style="margin-top:10px; padding:10px; background:white; border:1px solid #ddd; border-radius:5px;"></div>
+                        <div id="kesim-model-chart" class="chart-container" style="height:200px; margin-top:10px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="op-fason" class="tab-content-2" style="display:none;">
+                <div class="row">
+                    <div class="col-3">
+                        <h5>⚙️ Atama Parametreleri</h5>
+                        <div style="margin-bottom:10px;">
+                            <label><input type="radio" name="atamaTip" value="manuel" checked onclick="toggleAtamaMode()"> Manuel</label>
+                            <label style="margin-left:10px;"><input type="radio" name="atamaTip" value="model" onclick="toggleAtamaMode()"> Model</label>
+                        </div>
+                        <div id="atama-manuel">
+                            <label>Adet:</label>
+                            <input type="number" id="atama-adet" value="5000" style="width:100%; padding:5px;" oninput="checkFasonLimits()">
+                        </div>
+                        <div id="atama-model" style="display:none;">
+                            <label>Modeller (Atanmamış):</label>
+                            <select id="model-select" multiple style="width:100%; height:150px; padding:5px;" onchange="calcModelAdet()">
+                                <% data.models.forEach(m => { 
+                                    if (!data.assignedModels.includes(m['Model Kodu'])) {
+                                %>
+                                    <option value="<%= m['Model Kodu'] %>" data-kumas="<%= m['Gereken Kumaş (kg)'] %>"><%= m['Model Kodu'] %></option>
+                                <%  } }) %>
+                            </select>
+                            <div id="model-calc-res" style="color:#bf360c; font-weight:bold; margin-top:5px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="col-5">
+                        <h5>🏭 Fason Kapasite & Fiyatlar</h5>
+                        <div style="height:400px; overflow-y:auto;">
+                            <% data.fasonOptions.forEach((f, idx) => { 
+                                let currentUse = (data.currentFasonStatus[f.firma] ? data.currentFasonStatus[f.firma].adet : 0);
+                                let tierLimit = f.limitVal;
+                                let globalMax = data.fasonLimits[f.firma]; 
+                                let remainingGlobal = globalMax - currentUse;
+                            %>
+                            <div style="background:white; border:1px solid #ddd; padding:10px; margin-bottom:5px; border-radius:5px; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <b style="color:#3e2723"><%= f.firma %></b> <span style="font-size:0.85em; color:#666;">(<%= currentUse.toLocaleString() %> / <%= tierLimit.toLocaleString() %>)</span><br>
+                                    <span style="font-weight:bold; color:#bf360c;"><%= f['Birim Başına Ücret (TL)'] %> TL</span>
+                                </div>
+                                <div>
+                                    <% if (remainingGlobal <= 0) { %>
+                                        <span style="color:red; font-weight:bold; border:1px solid red; padding:2px 5px; border-radius:3px;">DOLU</span>
+                                    <% } else { %>
+                                        <button 
+                                            id="fason-btn-<%= idx %>"
+                                            class="assign-btn"
+                                            data-tier-limit="<%= tierLimit %>"
+                                            data-global-limit="<%= remainingGlobal %>"
+                                            onclick="assignFason('<%= f.firma %>', '<%= f['Birim Başına Ücret (TL)'] %>', '<%= f['Tahmini Teslimat Tarihi'] %>', <%= remainingGlobal %>)" 
+                                            style="width:auto; padding:5px 15px; background:#bf360c; color:white; border:none; border-radius:4px;">
+                                            Ata
+                                        </button>
+                                    <% } %>
+                                </div>
+                            </div>
+                            <% }) %>
+                        </div>
+                    </div>
+
+                    <div class="col-4">
+                        <h5>📊 Güncel Durum</h5>
+                        <% Object.keys(data.currentFasonStatus).forEach(k => { 
+                            let stat = data.currentFasonStatus[k];
+                            let max = data.fasonLimits[k];
+                            let pct = (stat.adet / max) * 100;
+                            let color = pct > 90 ? '#c62828' : (pct > 60 ? '#ef6c00' : '#2e7d32');
+                        %>
+                        <div class="factory-card" style="border-left: 5px solid <%= color %>; text-align:left; margin-bottom:10px;">
+                            <b style="font-size:1.1em"><%= k %></b><br>
+                            <%= stat.adet.toLocaleString() %> / <%= max.toLocaleString() %><br>
+                            <div style="background:#eee; height:8px; border-radius:4px; margin:5px 0;">
+                                <div style="width:<%= Math.min(pct, 100) %>%; background:<%= color %>; height:8px; border-radius:4px;"></div>
+                            </div>
+                            <span style="color:<%= color %>">%<%= pct.toFixed(1) %></span><br>
+                            <span style="color:#1565c0; font-weight:bold">📅 Tahmini: <%= stat.tarih %></span><br>
+                            <small>Maliyet: <%= formatTr(stat.tutar) %> TL</small>
+                            <% if (stat.modeller && stat.modeller.length > 0) { %>
+                            <details style="margin-top:5px;">
+                                <summary style="cursor:pointer; color:#bf360c; font-size:0.8em;">Modeller</summary>
+                                <div style="max-height:150px; overflow-y:auto; margin-top:5px;">
+                                    <% [...new Set(stat.modeller)].forEach(m => { 
+                                        let detay = data.models.find(x => x['Model Kodu'] == m);
+                                    %>
+                                        <div style="font-size:0.75em; border-top:1px solid #eee; padding:3px 0;">
+                                            <b style="color:#bf360c"><%= m %></b><br>
+                                            Teslim: <%= detay['İstenilen Teslim Tarihi'] %><br>
+                                            <span style="color:#c62828">En Geç: <%= detay['En Geç Teslim Tarihi'] %></span><br>
+                                            Ceza: <%= detay['Gecikme Bedeli (TL)'] %> TL
+                                        </div>
+                                    <% }) %>
+                                </div>
+                            </details>
+                            <% } %>
+                        </div>
+                        <% }) %>
+                        <button onclick="resetAssignments()" style="background:#c62828; margin-top:10px; width:100%;">🗑️ Sıfırla</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Server'dan gelen verileri Client değişkenlerine aktarıyoruz (Güvenli yöntem)
+        const dikimData = <%- JSON.stringify(data.dikim) %>;
+        const makineData = <%- JSON.stringify(data.makine) %>;
+        const tedarikData = <%- JSON.stringify(data.tedarik) %>;
+        const financeData = <%- JSON.stringify(data.finansOzet) %>;
+        const totalSabit = <%= data.sabitGiderToplam %>;
+        const totalFason = <%= data.totalFasonGider %>;
+        const assignments = <%- JSON.stringify(data.sessionAssignments) %>;
+        const modelToFirm = {}; 
+        <% data.models.forEach(m => { %> modelToFirm['<%= m["Model Kodu"] %>'] = '<%= m["Firma Adı"] %>'; <% }) %>
+        const globalDonemlik = <%= data.globalDonemlik %>;
+        const urunTalep = {}; 
+        <% data.models.forEach(m => { %>
+            if(!urunTalep['<%= m["Firma Adı"] %>']) urunTalep['<%= m["Firma Adı"] %>'] = 0;
+            urunTalep['<%= m["Firma Adı"] %>'] += <%= m["İstenen Adet"] %>;
+        <% }) %>
+        const gerekenKumas = <%- JSON.stringify(data.gerekenKumas) %>;
+        const kumasTedarik = <%- JSON.stringify(data.kumasTedarikcileri) %>;
+        const kesimData = <%- JSON.stringify(data.kesim) %>;
+        const assignedFabrics = <%- JSON.stringify(data.fabricAssignments) %>;
+
+        // Sayı Formatlayıcı
+        const fmt = (num) => new Intl.NumberFormat('tr-TR').format(num);
+
+        // Sayfa Geçişleri
+        function showPage(pageId) {
+            document.querySelectorAll('.page-section').forEach(d => d.style.display = 'none');
+            document.getElementById(pageId).style.display = 'block';
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        // Tab Geçişleri (Genel)
+        function openTab(evt, tabId) {
+            document.querySelectorAll('#genel-bakis .tab-content').forEach(d => d.style.display = 'none');
+            document.querySelectorAll('#genel-bakis .tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).style.display = 'block';
+            evt.currentTarget.classList.add('active');
+            window.dispatchEvent(new Event('resize'));
+        }
+        
+        // Tab Geçişleri (Operasyonel)
+        function openTab2(evt, tabId) {
+            document.querySelectorAll('#genel-islemler .tab-content-2').forEach(d => d.style.display = 'none');
+            document.querySelectorAll('#genel-islemler .tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).style.display = 'block';
+            evt.currentTarget.classList.add('active');
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        // Sayfa Yüklendiğinde
+        document.addEventListener("DOMContentLoaded", function() {
+            const firmalar = [...new Set(gerekenKumas.map(x => x['Firma Adı'].trim()))];
+            const kumasSelect = document.getElementById('kumas-firma-select');
+            const kesimSelect = document.getElementById('kesim-firma-select');
+            
+            firmalar.forEach(f => {
+                kumasSelect.add(new Option(f, f));
+                kesimSelect.add(new Option(f, f));
+            });
+
+            renderCharts();
+            updateFinance();
+            checkFasonLimits();
+        });
+
+        // ------------------ GRAFİKLER ------------------
+        function renderCharts() {
+            // Esmira Grafik
+            const esmiraData = dikimData.find(d => d.Ad === 'esmira');
+            if(esmiraData) {
+                const periods = Array.from({length: 20}, (_, i) => `${i+1}. Dönem`);
+                const esmiraVals = periods.map((_, i) => esmiraData[`${i+1}. Dönem`]);
+                const pctText = esmiraVals.map((v, i) => {
+                    if (i === 0) return "";
+                    const prev = esmiraVals[i-1];
+                    const pct = prev > 0 ? ((v - prev) / prev) * 100 : 0;
+                    return pct > 0 ? `▲%${pct.toFixed(1)}` : `▼%${Math.abs(pct).toFixed(1)}`;
+                });
+                const colors = pctText.map(t => t.includes('▲') ? 'green' : (t ? 'red' : 'black'));
+                Plotly.newPlot('esmira-chart', [{x: periods, y: esmiraVals, type: 'scatter', mode: 'lines+markers+text', text: pctText, textposition: 'top center', textfont: { color: colors, size: 9 }, line:{color:'#bf360c'}}], {margin:{t:20,b:30,l:40,r:10}, height:220, autosize:true}, {responsive:true});
+            }
+            
+            // Toplam İşlemler
+            const totalVals = Array.from({length: 20}, (_, i) => dikimData.reduce((sum, d) => sum + (d[`${i+1}. Dönem`] || 0), 0));
+            const periods = Array.from({length: 20}, (_, i) => `${i+1}. Dönem`);
+            Plotly.newPlot('total-chart', [{x: periods, y: totalVals, type: 'scatter', mode: 'lines+markers', line:{color:'#5d4037'}}], {margin:{t:10,b:30,l:40,r:10}, height:220, autosize:true}, {responsive:true});
+            
+            // Makine Durumu
+            const statusCounts = {};
+            makineData.forEach(m => { statusCounts[m['Güncel Durum']] = (statusCounts[m['Güncel Durum']] || 0) + 1; });
+            Plotly.newPlot('makine-pie', [{labels: Object.keys(statusCounts), values: Object.values(statusCounts), type: 'pie', hole: 0.4, marker: {colors: ['#2e7d32', '#c62828']}}], {margin:{t:0,b:0,l:0,r:0}, height:220, showlegend:true}, {responsive:true});
+            
+            // Tedarik Bar
+            Plotly.newPlot('tedarik-bar', [{x: tedarikData.map(t => t['Firma Adı']), y: tedarikData.map(t => t['Birim Başına Ücret (TL)']), type: 'bar', marker: {color: ['#5d4037', '#8d6e63', '#a1887f']}}], {margin:{t:10,b:30,l:30,r:10}, height:220, autosize:true, bargap: 0.75}, {responsive:true});
+        }
+
+        // ------------------ FİNANS & KPI ------------------
+        function updateFinance() {
+            const select = document.getElementById('tender-select');
+            const selected = Array.from(select.selectedOptions).map(o => o.value);
+            let filtered = financeData;
+            let displayFason = totalFason;
+            let displaySabit = totalSabit;
+            let isFiltered = false;
+            let ihaleTalep = 0;
+            let fasonaGidenAdet = 0;
+
+            if (selected.length > 0) {
+                isFiltered = true;
+                filtered = financeData.filter(f => selected.includes(f.firma));
+                let fasonSum = 0;
+                assignments.forEach(a => {
+                    let isRelevant = false;
+                    if(a.mod && a.mod.length > 0) {
+                        for(let m of a.mod) if(selected.includes(modelToFirm[m])) { isRelevant = true; break; }
+                    }
+                    if(isRelevant) {
+                        fasonSum += a.tutar;
+                        fasonaGidenAdet += a.adet;
+                    }
+                });
+                displayFason = fasonSum;
+                selected.forEach(f => ihaleTalep += (urunTalep[f] || 0));
+            }
+            const sumCiro = filtered.reduce((a, b) => a + b.gelir, 0);
+            const sumDegisken = filtered.reduce((a, b) => a + b.toplamDegisken, 0);
+            const netKar = sumCiro - sumDegisken - displayFason - (displaySabit * 6); 
+            const fabrikaYuku = ihaleTalep - fasonaGidenAdet;
+
+            document.getElementById('finance-kpis').innerHTML = `
+                <div class='kpi-card'><div class='kpi-title'>Toplam Ciro</div><div class='kpi-value'>₺${fmt(sumCiro)}</div></div>
+                <div class='kpi-card'><div class='kpi-title'>Değişken (K+K)</div><div class='kpi-value' style='color:#ef6c00'>₺${fmt(sumDegisken)}</div></div>
+                <div class='kpi-card'><div class='kpi-title'>Dönemlik Sabit Gider</div><div class='kpi-value' style='color:#d84315'>₺${fmt(displaySabit * 6)}</div></div>
+                <div class='kpi-card'><div class='kpi-title'>Fason Gideri</div><div class='kpi-value' style='color:#1565c0'>₺${fmt(displayFason)}</div></div>
+                <div class='kpi-card'><div class='kpi-title'>${isFiltered ? 'OPERASYONEL KAR' : 'NET KAR'}</div><div class='kpi-value' style='color:${netKar > 0 ? 'green' : 'red'}'>₺${fmt(netKar)}</div></div>
+            `;
+            const capRes = document.getElementById('capacity-result');
+            if (isFiltered && globalDonemlik > 0) {
+                let oran = (fabrikaYuku / globalDonemlik) * 100;
+                let msg = oran <= 100 ? `<span style="color:green">✅ Karşılanabilir (%${oran.toFixed(1)}) - Dönemlik</span>` : `<span style="color:red">⚠️ Kapasite Aşımı (%${oran.toFixed(1)}) - Dönemlik</span>`;
+                capRes.innerHTML = `
+                    <div style="font-size:0.9em; margin-bottom:5px;">
+                        Toplam Talep: <b>${fmt(ihaleTalep)}</b><br>
+                        Fasona Gönderilen: <b style="color:#1565c0">${fmt(fasonaGidenAdet)}</b><br>
+                        --------------------------<br>
+                        Fabrika Yükü: <b>${fmt(fabrikaYuku)}</b>
+                    </div>
+                    ${msg}
+                `;
+            } else {
+                capRes.innerHTML = "";
+            }
+            let tableHtml = `<table style="width:100%; font-size:0.8em;"><tr><th>Firma</th><th>Gelir</th><th>Kumaş</th><th>Kesim</th><th>Kar</th></tr>`;
+            filtered.forEach(f => {
+                tableHtml += `<tr><td>${f.firma}</td><td>${fmt(f.gelir)}</td><td>${fmt(f.kumas)}</td><td>${fmt(f.kesim)}</td><td>${fmt(f.brutKar)}</td></tr>`;
+            });
+            tableHtml += `</table>`;
+            document.getElementById('finance-table-container').innerHTML = tableHtml;
+            const traceIncome = { x: ['Gelir', 'Giderler'], y: [sumCiro, 0], name: 'Toplam Gelir', type: 'bar', marker: {color: '#2e7d32'} };
+            const traceVar = { x: ['Gelir', 'Giderler'], y: [0, sumDegisken], name: 'Değişken (K+K)', type: 'bar', marker: {color: '#ef6c00'} };
+            const traceFason = { x: ['Gelir', 'Giderler'], y: [0, displayFason], name: 'Fason', type: 'bar', marker: {color: '#1565c0'} };
+            const traceFixed = { x: ['Gelir', 'Giderler'], y: [0, displaySabit * 6], name: 'Sabit', type: 'bar', marker: {color: '#d84315'} };
+            Plotly.newPlot('finance-chart', [traceIncome, traceVar, traceFason, traceFixed], { barmode: 'stack', margin: {l:40, r:10, t:10, b:30}, height: 230, autosize:true, bargap: 0.75}, {responsive:true});
+        }
+
+        // ------------------ KUMAŞ İŞLEMLERİ ------------------
+        function updateKumasNeeds() {
+            const firma = document.getElementById('kumas-firma-select').value;
+            if(!firma) return;
+            const ihtiyaclar = gerekenKumas.filter(k => k['Firma Adı'] === firma);
+            
+            const groups = {};
+            ihtiyaclar.forEach(item => {
+                const r = item['Gereken Kumaş Rengi'];
+                if (!groups[r]) groups[r] = { models: [], total: 0, quality: item['Kabul Edilen Kumaş Kalitesi'] };
+                groups[r].models.push(item);
+                groups[r].total += parseFloat(item['Gereken Miktar (kg)']);
+            });
+
+            let html = "";
+            Object.keys(groups).forEach(renk => {
+                const grp = groups[renk];
+                const generalAssign = assignedFabrics.find(a => a.firma === firma && a.renk === renk && a.model === 'ALL');
+                const status = generalAssign ? `<span style="color:green">✔️ ${generalAssign.tedarikci} (Tümü)</span>` : `<span style="color:#d32f2f">Seçilmedi</span>`;
+
+                html += `
+                    <div style="border-bottom:1px solid #ccc; padding:8px; margin-bottom:5px; background:#fafafa;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <b style="color:#bf360c">${renk}</b><br>
+                                Toplam: <b>${fmt(grp.total)} kg</b> | Kalite: ${grp.quality}<br>
+                                ${status}
+                            </div>
+                            <button onclick="showSupplierGraph('${firma}', 'ALL', '${renk}', '${grp.quality}', ${grp.total})" style="font-size:0.8em; padding:4px 8px; background:#5d4037; color:white; border:none; border-radius:3px;">Tedarikçi Gör</button>
+                        </div>
+                        <details style="margin-top:5px;">
+                            <summary style="font-size:0.8em; color:#777; cursor:pointer">Modelleri Gör</summary>
+                            <div style="padding-left:10px; margin-top:5px;">
+                                ${grp.models.map(m => {
+                                    const specAssign = assignedFabrics.find(a => a.firma === firma && a.model === m['Model Kodu'] && a.renk === renk);
+                                    const mStatus = specAssign ? `<span style="color:green">✔️ ${specAssign.tedarikci}</span>` : ``;
+                                    return `
+                                        <div style="border-top:1px solid #eee; padding:3px 0; font-size:0.85em; display:flex; justify-content:space-between;">
+                                            <span>${m['Model Kodu']} (${m['Gereken Miktar (kg)']} kg) ${mStatus}</span>
+                                            <button onclick="showSupplierGraph('${firma}', '${m['Model Kodu']}', '${renk}', '${grp.quality}', ${m['Gereken Miktar (kg)']})" style="font-size:0.7em; padding:2px 5px;">Detay Seç</button>
+                                        </div>
+                                    `
+                                }).join('')}
+                            </div>
+                        </details>
+                    </div>
+                `;
+            });
+            document.getElementById('kumas-needs-list').innerHTML = html;
+            document.getElementById('supplier-graph-area').innerHTML = `<div style="color:#888; text-align:center; padding:100px 0;">Soldan seçim yapın.</div>`;
+        }
+
+        function showSupplierGraph(firma, model, renk, kaliteStr, miktar) {
+            const requiredQ = kaliteStr.split(',').map(s => s.trim().toUpperCase());
+            const validSuppliers = kumasTedarik.filter(x => x['Kumaş Rengi'] === renk && requiredQ.includes(x['Kalite'].toUpperCase()));
+            
+            if(validSuppliers.length === 0) {
+                document.getElementById('supplier-graph-area').innerHTML = `<div style="color:red; text-align:center; padding:20px;">Uygun kalitede tedarikçi bulunamadı!</div>`;
+                return;
+            }
+
+            const costs = validSuppliers.map(s => s['Birim Fiyat (TL/kg)'] * miktar);
+            const suppliers = validSuppliers.map(s => `${s.tedarikci} (${s['Kalite']})`);
+            const prices = validSuppliers.map(s => s['Birim Fiyat (TL/kg)']);
+            const minCost = Math.min(...costs);
+            const colors = costs.map(c => c === minCost ? '#2e7d32' : '#d84315');
+
+            const trace = {
+                y: suppliers, x: costs, type: 'bar', orientation: 'h',
+                text: costs.map(c => `₺${fmt(c)}`), textposition: 'auto',
+                marker: { color: colors },
+                hovertemplate: '<b>%{y}</b><br>Toplam: ₺%{x:,.0f}<br>Birim: %{customdata} TL<extra></extra>',
+                customdata: prices
+            };
+            const layout = {
+                title: { text: `${model === 'ALL' ? 'TÜMÜ' : model} - ${renk} (${fmt(miktar)} kg)`, font: {size:12} },
+                margin: {t:30, l:120, r:20, b:20}, xaxis: { title: 'Toplam Maliyet (TL)' }, bargap: 0.5
+            };
+            Plotly.newPlot('supplier-graph-area', [trace], layout, {responsive:true});
+            document.getElementById('supplier-graph-area').on('plotly_click', function(data){
+                const idx = data.points[0].pointIndex;
+                const selectedSup = validSuppliers[idx];
+                assignFabric(firma, model, renk, selectedSup.tedarikci, selectedSup['Birim Fiyat (TL/kg)'], miktar);
+            });
+        }
+
+        async function assignFabric(firma, model, renk, tedarikci, fiyat, miktar) {
+            try {
+                const res = await fetch('/api/assign-fabric', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ firma, model, renk, tedarikci, fiyat, miktar }) 
+                });
+                if(res.ok) window.location.reload();
+                else {
+                    const err = await res.json();
+                    alert("Hata: " + (err.error || "İşlem başarısız"));
+                }
+            } catch (error) {
+                console.error("Fetch Hatası:", error);
+                alert("Sunucuya bağlanırken bir hata oluştu.");
+            }
+        }
+
+        // ------------------ KESİM & FASON İŞLEMLERİ ------------------
+        function updateKesimAnaliz() {
+            const firma = document.getElementById('kesim-firma-select').value;
+            if(!firma) return;
+            const subData = kesimData.filter(k => k['Firma Adı'] === firma);
+            const totKg = subData.reduce((s, x) => s + parseFloat(x['Kesilecek Kumaş Miktarı (kg)']), 0);
+            const totTl = subData.reduce((s, x) => s + x['Ödenmesi Gereken Tutar (TL)'], 0);
+            document.getElementById('kesim-total-kg').innerText = fmt(totKg) + ' kg';
+            document.getElementById('kesim-total-tl').innerText = fmt(totTl) + ' TL';
+            Plotly.newPlot('kesim-chart', [{x: subData.map(x => x['Model Kodu']), y: subData.map(x => x['Ödenmesi Gereken Tutar (TL)']), type: 'bar', marker:{color:'#bf360c'}}], {margin:{t:10,b:80,l:40,r:10}, height:300, autosize:true, bargap: 0.75}, {responsive:true});
+            const ms = document.getElementById('kesim-model-select');
+            ms.innerHTML = '<option value="">Model Seçiniz...</option>';
+            subData.forEach(x => ms.add(new Option(x['Model Kodu'], x['Model Kodu'])));
+        }
+
+        function updateKesimModelAnaliz() {
+            const model = document.getElementById('kesim-model-select').value;
+            if(!model) return;
+            const row = kesimData.find(x => x['Model Kodu'] === model);
+            document.getElementById('kesim-model-info').innerHTML = `<b>Teslimat:</b> ${row['Tahmini Teslimat Tarihi']} | <b>Birim:</b> ${row['Kesim Birim Fiyatı (TL/kg)']} TL`;
+            const firmaRows = kesimData.filter(x => x['Firma Adı'] === row['Firma Adı']);
+            const avg = firmaRows.reduce((s,x)=>s+x['Ödenmesi Gereken Tutar (TL)'],0) / firmaRows.length;
+            Plotly.newPlot('kesim-model-chart', [{y: ['Seçilen', 'Ortalama'], x: [row['Ödenmesi Gereken Tutar (TL)'], avg], type: 'bar', orientation: 'h', marker:{color:['#bf360c', '#ddd']}}], {margin:{t:10,b:30,l:80,r:10}, height:200, autosize:true}, {responsive:true});
+        }
+
+        function toggleAtamaMode() {
+            const val = document.querySelector('input[name="atamaTip"]:checked').value;
+            document.getElementById('atama-manuel').style.display = val === 'manuel' ? 'block' : 'none';
+            document.getElementById('atama-model').style.display = val === 'model' ? 'block' : 'none';
+        }
+
+        function checkFasonLimits() {
+            const adet = parseInt(document.getElementById('atama-adet').value) || 0;
+            const buttons = document.querySelectorAll('.assign-btn');
+            buttons.forEach(btn => {
+                const limit = parseInt(btn.getAttribute('data-tier-limit'));
+                if (adet > limit) {
+                    btn.disabled = true;
+                    btn.title = "Adet bu fiyat kademesinin kapasitesini aşıyor.";
+                    btn.style.opacity = "0.5";
+                } else {
+                    btn.disabled = false;
+                    btn.title = "";
+                    btn.style.opacity = "1";
+                }
+            });
+        }
+
+        function calcModelAdet() {
+            const opts = document.getElementById('model-select').selectedOptions;
+            let total = 0;
+            for(let o of opts) total += parseFloat(o.getAttribute('data-kumas')) * 3;
+            document.getElementById('atama-adet').value = parseInt(total);
+            document.getElementById('model-calc-res').innerText = `Hesaplanan: ${parseInt(total)}`;
+            checkFasonLimits();
+        }
+
+        // Fason Adet Input Listener
+        document.getElementById('atama-adet').addEventListener('input', checkFasonLimits);
+
+        // API: Fason Atama İşlemi
+        async function assignFason(firma, fiyat, tarih, remainingCapacity) {
+            const adet = parseInt(document.getElementById('atama-adet').value);
+            
+            // Client-side Kapasite Kontrolü
+            if (adet > remainingCapacity) {
+                alert("HATA: Kapasite aşımı! Kalan kapasite: " + remainingCapacity.toLocaleString());
+                return;
+            }
+
+            const tutar = adet * parseFloat(fiyat);
+            let mods = [];
+            
+            // Model seçimi varsa ekle
+            if(document.querySelector('input[name="atamaTip"]:checked').value === 'model') {
+                const opts = document.getElementById('model-select').selectedOptions;
+                for(let o of opts) mods.push(o.value);
+            }
+
+            // Backend'e POST İsteği
+            try {
+                // Butonu deaktif yap (Çift tıklamayı önlemek için)
+                const buttons = document.querySelectorAll('.assign-btn');
+                buttons.forEach(b => b.classList.add('btn-loading'));
+
+                const res = await fetch('/api/assign', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ firma, adet, tutar, tarih, mod: mods }) 
+                });
+
+                if(res.ok) {
+                    window.location.reload(); // Başarılıysa sayfayı yenile
+                } else {
+                    const err = await res.json();
+                    alert("Sunucu Hatası: " + (err.error || "İşlem yapılamadı."));
+                    buttons.forEach(b => b.classList.remove('btn-loading'));
+                }
+            } catch (error) {
+                console.error("API Error:", error);
+                alert("Bağlantı hatası oluştu.");
+                document.querySelectorAll('.assign-btn').forEach(b => b.classList.remove('btn-loading'));
+            }
+        }
+
+        // API: Tüm Atamaları Sıfırla
+        async function resetAssignments() {
+            if(!confirm("Tüm atamaları ve seçimleri sıfırlamak istediğinize emin misiniz?")) return;
+
+            try {
+                const res = await fetch('/api/reset', { method: 'POST' });
+                if(res.ok) window.location.reload();
+                else alert("Sıfırlama işlemi başarısız.");
+            } catch (error) {
+                console.error("Reset Error:", error);
+                alert("Sunucuya ulaşılamadı.");
+            }
+        }
+    </script>
+</body>
+</html>
