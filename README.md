@@ -13,7 +13,7 @@ Bu proje, tekstil üretim süreçlerini yönetmek, maliyet analizi yapmak, fason
 
 1.  Projeyi bilgisayarınıza indirin:
     ```bash
-    git clone <REPO_LINKI_GELECEK>
+    git clone <https://github.com/Furkan-Yel/KDS-Proje>
     ```
 2.  Gerekli paketleri yükleyin:
     ```bash
