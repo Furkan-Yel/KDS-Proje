@@ -66,4 +66,4 @@ Uygulama RESTful prensiplere uygun olarak aşağıdaki uç noktaları kullanır:
 * `config/`: Veritabanı bağlantı ayarları.
 
 ---
-**Geliştirici:** [Adın Soyadın]
+**Geliştirici:** [Furkan Yel]
