@@ -19,14 +19,20 @@ Bu proje, tekstil üretim süreçlerini yönetmek, maliyet analizi yapmak, fason
     ```bash
     npm install
     ```
-3.  Veritabanını oluşturun ve `.env` dosyasını ayarlayın:
-    * `.env.example` dosyasının adını `.env` yapın.
-    * İçerisine kendi MySQL bilgilerinizi girin.
-4.  Projeyi başlatın:
+3. Veritabanı Kurulumu:
+    * MySQL'de `kds_proje` adında boş bir veritabanı oluşturun.
+    * Proje klasöründeki `database/kds_proje.sql` dosyasını bu veritabanına import (içe aktar) edin.
+
+4. Ayarların Yapılandırılması (.env):
+    * Ana dizindeki `.env.example` dosyasının adını `.env` olarak değiştirin.
+    * Bu dosyanın içine kendi MySQL kullanıcı adı ve şifrenizi girin.
+    * `DB_NAME` kısmının oluşturduğunuz veritabanı adıyla aynı olduğundan emin olun.
+
+5. Projeyi Başlatın:
     ```bash
     node app.js
     ```
-5.  Tarayıcıda `http://localhost:3000` adresine gidin.
+6.  Tarayıcıda `http://localhost:3000` adresine gidin.
     * **Kullanıcı Adı:** furkan
     * **Şifre:** furkan123
 
